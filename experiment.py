@@ -6,7 +6,7 @@ import klibs
 from klibs import P
 from klibs.KLGraphics import *
 from klibs.KLUtilities import *
-from klibs.KLUserInterface import *
+#from klibs.KLUserInterface import *
 from klibs.KLGraphics.KLNumpySurface import *
 from CompTrack import *
 
@@ -18,32 +18,39 @@ class CompensatoryTrackingTask(klibs.Experiment):
 
 	def setup(self):
 
-		# PVTarget's mouse velocity algo triggers OS X's Settings->Accessibility->Display->Shake Mouse Pointer To Locate
+		# Ensure mouse-shake setting is disabled, as it will be triggered by mouse input
 		if not P.development_mode:
+			self.txtm.add_style('UserAlert', 16, (255, 000, 000))
 			self.check_osx_mouse_shake_setting()
 
-		self.txtm.add_style('UserAlert', 16, (255, 000, 000))
-
+		# CompTrack class handles all events
 		self.comp_track = CompTrack()
 
+		# Set session parameters
+		self.comp_track.session_params['exp_duration'] = 1800  # Total duration of session, in seconds
+		self.comp_track.session_params['reset_target_after_poll'] = True  # Should cursor reset to center after PVT events?
 
-		self.comp_track.task_params['exp_duration'] = 150  # seconds
-		self.comp_track.task_params['poll_while_moving'] = True
-		self.comp_track.task_params['reset_target_after_poll'] = True  # sets target back to fixation after a response
-
+		# Compute timestamps to present PVT at
 		self.comp_track.generate_PVT_timestamps()
 
+		# Ensure display has been wiped before starting
 		clear()
 		flip()
+
+		# Ensure mouse starts at centre and set invisible
 		mouse_pos(False, P.screen_c)
 		hide_mouse_cursor()
+
+		# Begin testing session
 		session_start = now()
-		while (now() - session_start) < self.comp_track.task_params['exp_duration']:
-			events = pump(True)
-			self.comp_track.refresh(events)
-			ui_request(queue=events)
+		while (now() - session_start) < self.comp_track.session_params['exp_duration']:
+			events = pump(True)  # Check for input
+			self.comp_track.refresh(events)  # Process inputs, if any, and update task state
+			ui_request(queue=events)  # Check input for quit command
 
 		# self.db.export(table='comp_track_data')
+
+		# Exit program
 		exit()
 
 	def block(self):

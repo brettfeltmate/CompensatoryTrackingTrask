@@ -36,7 +36,6 @@ class CompTrack(EnvAgent):
         #
         # Define styles & create stimuli
         #
-
         self.palette = {
             'grue': (025, 025, 28),  # mysteriously, leading zero throws a syntax error in last value
             'white': (255, 255, 255),
@@ -45,30 +44,48 @@ class CompTrack(EnvAgent):
             'black': (000, 000, 000)
         }
 
-        stim_size = {
+        self.stim_sizes = {
             'cursor': deg_to_px(1),
             'fixation': [deg_to_px(1.4), deg_to_px(0.2)],
             'PVT_frame': [deg_to_px(6), deg_to_px(3)],
-            'PVT_digits': deg_to_px(1.5)
+            'PVT_digits': deg_to_px(1.5),
+            'inner_ring': [P.screen_x * 0.3, deg_to_px(0.1)],
+            'middle_ring': [P.screen_x * 0.6, deg_to_px(0.1)],
+            'outer_ring': [P.screen_x * 0.9, deg_to_px(0.1)]
         }
 
         # PVT digit text style
-        self.txtm.add_style('PVT_digits', stim_size['PVT_digits'] * .75, self.palette['white'])
+        self.txtm.add_style('PVT_digits', self.stim_sizes['PVT_digits'] * .75, self.palette['white'])
 
         # Visual assets
         self.assets = {
             'fixation': Annulus(
-                diameter=stim_size['fixation'][0],
-                thickness=stim_size['fixation'][1],
+                diameter=self.stim_sizes['fixation'][0],
+                thickness=self.stim_sizes['fixation'][1],
                 fill=self.palette['white']
             ),
+            'inner_ring': Annulus(
+                diameter=self.stim_sizes['inner_ring'][0],
+                thickness=self.stim_sizes['inner_ring'][1],
+                fill=self.palette['red']
+            ),
+            'middle_ring': Annulus(
+                diameter=self.stim_sizes['middle_ring'][0],
+                thickness=self.stim_sizes['middle_ring'][1],
+                fill=self.palette['red']
+            ),
+            'outer_ring': Annulus(
+                diameter=self.stim_sizes['outer_ring'][0],
+                thickness=self.stim_sizes['outer_ring'][1],
+                fill=self.palette['red']
+            ),
             'cursor': Circle(
-                diameter=stim_size['cursor'],
+                diameter=self.stim_sizes['cursor'],
                 fill=self.palette['green']
             ),
             'PVT_frame': Rectangle(
-                width=stim_size['PVT_frame'][0],
-                height=stim_size['PVT_frame'][1],
+                width=self.stim_sizes['PVT_frame'][0],
+                height=self.stim_sizes['PVT_frame'][1],
                 stroke=[2, self.palette['red'], STROKE_OUTER]
                 ).render()
         }
@@ -77,31 +94,35 @@ class CompTrack(EnvAgent):
         #
         # Initialize task parameters
         #
-        self.task_params = {
+        self.session_params = {
             'poll_while_moving': True,          # Should PVT events occur during tracking?
             'poll_at_fixation': False,          # Should PVT events occur upon reaching centre?
             'exp_duration': 300,                # Duration of task in seconds
             'PVT_rate': 3,                      # Desired number of PVT events to be sampled from interval_bounds
-            'PVT_interval_bounds': [10, 30],    # Set min/max durations that can elapse before next PVT event
+            'PVT_interval_bounds': [5, 30],     # Set min/max durations that can elapse before next PVT event
             'PVT_timestamps': None,             # List of timepoints at which to present PVT, populated at runtime
             'reset_target_after_poll': True,    # Should cursor be re-centred following a PVT event?
             'x_bounds': [                       # To prevent cursor moving off screen
-                int(0.5 * stim_size['cursor']),
-                int(P.screen_x - 0.5 * stim_size['cursor'])
-            ]
+                int(0.5 * self.stim_sizes['cursor']),
+                int(P.screen_x - 0.5 * self.stim_sizes['cursor'])
+            ],
+            'additional_force': []
+
         }
 
         #
         # Initialize container to store dynamic properties
         #
-        self.task_state = {
+        self.current_state = {
             'x_pos': P.screen_c[0],     # Stores current x-pos of cursor
             'do_PVT': False,            # When True, PVT is presented on current refresh
             'PVT_start': None,          # Stores timestamp of PVT onset
-            'modifier_values': None,    # Populated with values used to generate additional buffeting forces
             'current_modifier': 0,      # Indexes which modifier value is to be used on current refresh
-            'PVT_event_count': 0     # Stores running total of PVT events presented
+            'PVT_event_count': 0        # Stores running total of PVT events presented
         }
+
+
+
 
         # Generate modifier values using initial default values
         self.__compute_buffet_modifier_values()
@@ -129,24 +150,23 @@ class CompTrack(EnvAgent):
         # Generate geometric sequence of interval durations
         intervals = np.around(
             np.geomspace(
-                start=self.task_params['PVT_interval_bounds'][0],
-                stop=self.task_params['PVT_interval_bounds'][1],
-                num=self.task_params['PVT_rate']  # Desired number of intervals to return
+                start=self.session_params['PVT_interval_bounds'][0],
+                stop=self.session_params['PVT_interval_bounds'][1],
+                num=self.session_params['PVT_rate']  # Desired number of intervals to return
             )
         ).astype(int)
 
         # Populate timestamps
-        self.task_params['PVT_timestamps'] = intervals
+        self.session_params['PVT_timestamps'] = intervals
 
         # Keep generating & adding intervals until running sum approaches experiment duration
-        while np.sum(self.task_params['PVT_timestamps']) <= (self.task_params['exp_duration'] - np.sum(intervals)):
-            self.task_params['PVT_timestamps'] = np.append(self.task_params['PVT_timestamps'], intervals)
+        while np.sum(self.session_params['PVT_timestamps']) <= (self.session_params['exp_duration'] - np.sum(intervals)):
+            self.session_params['PVT_timestamps'] = np.append(self.session_params['PVT_timestamps'], intervals)
 
-        # Psuedo-randomize intervals
-        shuffle(self.task_params['PVT_timestamps'])
-        # Convert intervals into cumulative sum of preceding values
-        self.task_params['PVT_timestamps'] = np.cumsum(self.task_params['PVT_timestamps'])
-
+        # shuffle intervals (otherwise it would be a repeating sequence)
+        shuffle(self.session_params['PVT_timestamps'])
+        # Convert intervals into timestamps by taking cumulative sum of preceding intervals
+        self.session_params['PVT_timestamps'] = np.cumsum(self.session_params['PVT_timestamps'])
 
 
     def refresh(self, event_queue):
@@ -157,23 +177,30 @@ class CompTrack(EnvAgent):
         self.event_data['timestamp'] = now() - self.__init_time
 
         # Determine when next PVT event should occur
-        next_PVT_event = self.task_params['PVT_timestamps'][self.task_state['PVT_event_count']] if self.task_state['PVT_event_count'] < len(self.task_params['PVT_timestamps']) else None
+        if self.current_state['PVT_event_count'] < len(self.session_params['PVT_timestamps']):
+            next_PVT_event = self.session_params['PVT_timestamps'][self.current_state['PVT_event_count']]
+        else:
+            next_PVT_event = None
 
-        # Determine if PVT event should occur this refresh
-        if next_PVT_event is not None:
-            if self.event_data['timestamp'] >= next_PVT_event and not self.task_state['do_PVT']:  # Don't do if doing
-                self.task_state['PVT_start'] = now()
-                self.task_state['PVT_event_count'] += 1
-                self.task_state['do_PVT'] = True
+        next_PVT_event = None
+        # If PVT event not currently in progress, and subsequent PVT events remain
+        if not self.current_state['do_PVT'] and next_PVT_event is not None:
+            # present PVT after the appropriate time has passed
+            if self.event_data['timestamp'] >= next_PVT_event:
+                self.current_state['PVT_start'] = now()
+                self.current_state['PVT_event_count'] += 1
+                self.current_state['do_PVT'] = True
 
-        # Listen for PVT response
+        # Listen for PVT response (silently returns if PVT not in progress)
         self.__fetch_response(event_queue)
+
         # Compute buffeting forces
         self.__compute_forces()
 
-        # If not PVT event, listen for mouse movement & update position accordingly
-        if self.task_params['poll_while_moving'] or not self.task_state['do_PVT']:
+        # If PVT not in progress, listen for & capture mouse input
+        if not self.current_state['do_PVT']:
             self.__capture_input(event_queue)
+            # Update cursor position, applying mouse input & buffeting forces
             self.position = self.position + self.event_data['total_force'] + self.event_data['user_input']
 
         # Write trial details to database
@@ -181,74 +208,80 @@ class CompTrack(EnvAgent):
         # Render stimuli
         self.__render()
 
+
     def __render(self):
         # Renders stimuli to screen
 
         # Paint & populate display
         fill(self.palette['grue'])
 
-        # TODO: pretty sure I could set via self.assets.cursor.fill
-
         # Spawn & blit PVT display (if PVT event)
-        if self.task_state['do_PVT']:
-            digit_str = str((now() - self.task_state['PVT_start']) * 1000)[0:4]
+        if self.current_state['do_PVT']:
+            # Digit string represents milliseconds elapsed since PVT onset
+            digit_str = str((now() - self.current_state['PVT_start']) * 1000)[0:4]
             if digit_str[-1] == ".":
                 digit_str = digit_str[0:3]
             digits = message(digit_str, 'PVT_digits', flip_screen=False, blit_txt=False)
             blit(self.assets['PVT_frame'], BL_CENTER, P.screen_c)
             blit(digits, BL_CENTER, P.screen_c)
+        # Otherwise, blit cursor to updated position
         else:
             blit(self.assets['fixation'], BL_CENTER, P.screen_c)
+            blit(self.assets['inner_ring'], BL_CENTER, P.screen_c)
+            blit(self.assets['middle_ring'], BL_CENTER, P.screen_c)
+            blit(self.assets['outer_ring'], BL_CENTER, P.screen_c)
             blit(self.assets['cursor'], BL_CENTER, [self.position, P.screen_c[1]])
 
         # Present display
         flip()
 
 
-    def __compute_buffet_modifier_values(self, start=-2.0, stop=2.0, step=0.01):
+    def __compute_buffet_modifier_values(self, start=0.1, stop=1.4, count=100):
         # Generates cyclical sequence of modifier terms used to generate additional buffeting forces
-        modifiers = np.arange(start, stop, step)
-        self.task_state['modifier_values'] = np.append(modifiers, modifiers[-1:1:-1])
+        modifiers = np.tan(np.geomspace(start, stop, count))
+
+        # Make modifier list 'cyclical' by flipping sign & reversing order (also trim end points to remove duplicates)
+        # TODO: prime opportunity for a Missy Elliot reference
+        flip_and_reverse = np.negative(modifiers[-1:1:-1])
+
+
+        self.session_params['additional_force'] = np.append(modifiers, flip_and_reverse)
 
 
     def __buffeting_force(self):
         # Generates constant buffeting force
-        warren_buffett = 2 * \
-         (
-             sin(4 * self.event_data['timestamp']) +
-             sin(0.3 * (2 * self.event_data['timestamp'])) +
-             sin(0.6 * (2 * self.event_data['timestamp'])) +
-             sin(0.9 * (2 * self.event_data['timestamp']))
-         )
-        return warren_buffett
+        t = self.event_data['timestamp']
+        return 2 * (sin(t) + sin(0.3*t) + sin(0.5*t) + sin(0.7*t) - sin(0.9*t))
 
 
     def __additional_buffeting_force(self):
         # Generates additional buffeting forces
-        doris_buffett = self.task_state['modifier_values'][self.task_state['current_modifier']] * cos(self.event_data['timestamp'])
+        mod_idx = self.current_state['current_modifier']
 
-        if self.task_state['current_modifier'] == len(self.task_state['modifier_values']) - 1:
-            self.task_state['current_modifier'] = 0
+
+
+        if self.current_state['current_modifier'] == len(self.session_params['additional_force']) - 1:
+            self.current_state['current_modifier'] = 0
         else:
-            self.task_state['current_modifier'] += 1
+            self.current_state['current_modifier'] += 1
 
-        return doris_buffett
+        return self.session_params['additional_force'][mod_idx]
 
 
     def __compute_forces(self):
-        # Aggregates buffeting forces for current refresh
+        # Aggregates buffeting forces to be applied on next render
         self.event_data['buffeting_force'] = self.__buffeting_force()
         self.event_data['additional_force'] = self.__additional_buffeting_force()
-        self.event_data['total_force'] = self.event_data['buffeting_force'] + self.event_data['additional_force']
+        self.event_data['total_force'] = self.event_data['buffeting_force'] #+ self.event_data['additional_force']
 
 
     def __fetch_response(self, event_queue):
         # Captures PVT responses
-        if not self.task_state['do_PVT']:  # Do nothing if nothing need doing
+        if not self.current_state['do_PVT']:  # Do nothing if nothing need doing
             return
 
         # Time elapsed since PVT onset
-        rt = now() - self.task_state['PVT_start']
+        rt = now() - self.current_state['PVT_start']
 
         if rt < 1:          # Until 1 sec has passed, listen for response
             for event in event_queue:
@@ -262,8 +295,8 @@ class CompTrack(EnvAgent):
 
         # After response, or timeout, terminate PVT and reset cursor to screen center
         if self.event_data['PVT_RT'] != 'NA':
-            self.task_state['do_PVT'] = False
-            if self.task_params['reset_target_after_poll']:
+            self.current_state['do_PVT'] = False
+            if self.session_params['reset_target_after_poll']:
                 self.position = P.screen_c[0]
 
 
@@ -321,16 +354,15 @@ class CompTrack(EnvAgent):
     @property
     def position(self):
         # get current position of cursor
-        return self.task_state['x_pos']
+        return self.current_state['x_pos']
 
     @position.setter
     def position(self, val):
         # Set position of cursor, censors values which would place the cursor off screen
-
-        if int(val) not in range(*self.task_params['x_bounds']):
-            if val < self.task_params['x_bounds'][0]:
-                val = self.task_params['x_bounds'][0]
+        if int(val) not in range(*self.session_params['x_bounds']):
+            if val < self.session_params['x_bounds'][0]:
+                val = self.session_params['x_bounds'][0]
             else:
-                val = self.task_params['x_bounds'][1]
+                val = self.session_params['x_bounds'][1]
 
-        self.task_state['x_pos'] = val
+        self.current_state['x_pos'] = val
