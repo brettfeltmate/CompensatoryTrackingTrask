@@ -182,7 +182,6 @@ class CompTrack(EnvAgent):
         else:
             next_PVT_event = None
 
-        next_PVT_event = None
         # If PVT event not currently in progress, and subsequent PVT events remain
         if not self.current_state['do_PVT'] and next_PVT_event is not None:
             # present PVT after the appropriate time has passed
@@ -251,7 +250,7 @@ class CompTrack(EnvAgent):
     def __buffeting_force(self):
         # Generates constant buffeting force
         t = self.event_data['timestamp']
-        return 2 * (sin(t) + sin(0.3*t) + sin(0.5*t) + sin(0.7*t) - sin(0.9*t))
+        return sin(t) + sin(0.3*t) + sin(0.5*t) + sin(0.7*t) - sin(0.9*t)
 
 
     def __additional_buffeting_force(self):
@@ -306,14 +305,15 @@ class CompTrack(EnvAgent):
         for event in event_queue:
             if event.type == sdl2.SDL_MOUSEMOTION:
                 # Censor grandiose mouse motion to prevent eclipsing buffeting forces
-                # TODO: Cutoffs should be dynamically generated relative to forcing function
-                if -7 < event.motion.xrel < 7:
-                    self.event_data['user_input'] = event.motion.xrel
-                elif event.motion.xrel < -7:
-                    self.event_data['user_input'] = -7
-                else:
-                    self.event_data['user_input'] = 7
+                # # TODO: Cutoffs should be dynamically generated relative to forcing function
+                # if -4 < event.motion.xrel < 4:
+                #     self.event_data['user_input'] = event.motion.xrel
+                # elif event.motion.xrel < -4:
+                #     self.event_data['user_input'] = -4
+                # else:
+                #     self.event_data['user_input'] = 4
 
+                self.event_data['user_input'] = event.motion.xrel
         # Maintain mouse cursor at screen center to ensure all movement is catchable (i.e., can't run off screen)
         mouse_pos(False, P.screen_c)
 
