@@ -304,8 +304,9 @@ class CompTrack(EnvAgent):
 
         for event in event_queue:
             if event.type == sdl2.SDL_MOUSEMOTION:
-                # Censor grandiose mouse motion to prevent eclipsing buffeting forces
+                # Censor grandiose mouse motion to prevent them from eclipsing buffeting forces
                 # # TODO: Cutoffs should be dynamically generated relative to forcing function
+                # TODO: Why did I comment this out?
                 # if -4 < event.motion.xrel < 4:
                 #     self.event_data['user_input'] = event.motion.xrel
                 # elif event.motion.xrel < -4:
