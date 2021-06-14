@@ -148,6 +148,7 @@ class CompTrack(EnvAgent):
         # Generates time-points at which to present PVT events
 
         # Generate geometric sequence of interval durations
+        # TODO: Actually, now that I think about it, aren't PVT trials uniformly distributed? This can be changed later.
         intervals = np.around(
             np.geomspace(
                 start=self.session_params['PVT_interval_bounds'][0],
@@ -235,24 +236,31 @@ class CompTrack(EnvAgent):
         flip()
 
 
+    # TODO: Jon. Don't get me started on how frustrated it makes me that our
+    #  prior efforts were basically tossed away (and likely to be revived).
+    #  But also do get me started because it'll become relevant
+
+    def __buffeting_force(self):
+        # Generates constant buffeting force
+        t = self.event_data['timestamp']
+        # Force equals a collective conspiracy of several sinusoidal waveforms
+        return sin(t) + sin(0.3*t) + sin(0.5*t) + sin(0.7*t) - sin(0.9*t)
+
+
+
+    # TODO: will be implemented in conjunction with the below function to add an additional degree of randomness
     def __compute_buffet_modifier_values(self, start=0.1, stop=1.4, count=100):
         # Generates cyclical sequence of modifier terms used to generate additional buffeting forces
         modifiers = np.tan(np.geomspace(start, stop, count))
 
         # Make modifier list 'cyclical' by flipping sign & reversing order (also trim end points to remove duplicates)
-        # TODO: prime opportunity for a Missy Elliot reference
+        # TODO: make Missy Elliot function
         flip_and_reverse = np.negative(modifiers[-1:1:-1])
 
 
         self.session_params['additional_force'] = np.append(modifiers, flip_and_reverse)
 
-
-    def __buffeting_force(self):
-        # Generates constant buffeting force
-        t = self.event_data['timestamp']
-        return sin(t) + sin(0.3*t) + sin(0.5*t) + sin(0.7*t) - sin(0.9*t)
-
-
+    # TODO: Currently not in use, as it remains to be decided how/why/when to generate additional forces.
     def __additional_buffeting_force(self):
         # Generates additional buffeting forces
         mod_idx = self.current_state['current_modifier']
@@ -270,7 +278,7 @@ class CompTrack(EnvAgent):
     def __compute_forces(self):
         # Aggregates buffeting forces to be applied on next render
         self.event_data['buffeting_force'] = self.__buffeting_force()
-        self.event_data['additional_force'] = self.__additional_buffeting_force()
+        #self.event_data['additional_force'] = self.__additional_buffeting_force()
         self.event_data['total_force'] = self.event_data['buffeting_force'] #+ self.event_data['additional_force']
 
 
@@ -299,6 +307,7 @@ class CompTrack(EnvAgent):
                 self.position = P.screen_c[0]
 
 
+    # TODO: Jon, why this is different is a long story better explained in convo
     def __capture_input(self, event_queue):
         # Captures mouse motion events
 
@@ -319,6 +328,7 @@ class CompTrack(EnvAgent):
         mouse_pos(False, P.screen_c)
 
 
+    # TODO: Jon, I rejigged how data is written. Now it all gets inserted into a single DB
     def __write_data(self):
         # Writes event by event data to database
         self.db.insert(
@@ -338,6 +348,7 @@ class CompTrack(EnvAgent):
         )
 
 
+    # Will be used to monitor running PVT performance, once the rules around that are decided.
     def get_last_entry(self, column):
         # Used to access currently recorded data by variable column
         # TODO: allow for specifying how many entries to queried
