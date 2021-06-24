@@ -27,7 +27,7 @@ class CompensatoryTrackingTask(klibs.Experiment):
 		self.comp_track = CompTrack()
 
 		# Set session parameters
-		self.comp_track.session_params['exp_duration'] = 1800  # Total duration of session, in seconds
+		self.comp_track.session_params['exp_duration'] = 300  # Total duration of session, in seconds
 		self.comp_track.session_params['reset_target_after_poll'] = True  # Should cursor reset to center after PVT events?
 
 		# Compute timestamps to present PVT at

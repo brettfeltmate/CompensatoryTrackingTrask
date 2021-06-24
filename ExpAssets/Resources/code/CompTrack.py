@@ -98,8 +98,7 @@ class CompTrack(EnvAgent):
             'poll_while_moving': True,          # Should PVT events occur during tracking?
             'poll_at_fixation': False,          # Should PVT events occur upon reaching centre?
             'exp_duration': 300,                # Duration of task in seconds
-            'PVT_rate': 3,                      # Desired number of PVT events to be sampled from interval_bounds
-            'PVT_interval_bounds': [5, 30],     # Set min/max durations that can elapse before next PVT event
+            'PVT_ITI': [2, 10],                 # Min & max bounds defining inter-trial interval between PVT onsets
             'PVT_timestamps': None,             # List of timepoints at which to present PVT, populated at runtime
             'reset_target_after_poll': True,    # Should cursor be re-centred following a PVT event?
             'x_bounds': [                       # To prevent cursor moving off screen
@@ -147,27 +146,64 @@ class CompTrack(EnvAgent):
     def generate_PVT_timestamps(self):
         # Generates time-points at which to present PVT events
 
+        # Initial list of timestamps is created to be of
+        # length equal to total testing duration, divided by mean ITI value
+        # i.e., a ballpark value of how many PVT events should be able to fit within exp_duration
+        event_count = int(self.session_params['exp_duration'] / math.floor(np.mean(self.session_params['PVT_ITI'])))
+
+        # Randomly & uniformly sample PVT timepoints of length event_count from ITI range
+        timestamps = np.random.randint(
+            low=self.session_params['PVT_ITI'][0],
+            high=self.session_params['PVT_ITI'][1] + 1,
+            size=event_count
+        )
+
+        # Ensure sum of PVT timepoints matches length of testing session
+        # At least, pragmatically so. This will likely result in one to few or many events,
+        # but that shouldn't matter.
+        if np.sum(timestamps) < self.session_params['exp_duration']:
+            # If sum of timestamps shorter than desired, iteratively append new values
+            while np.sum(timestamps) < self.session_params['exp_duration']:
+                timestamp = np.random.randint(
+                    low=self.session_params['PVT_ITI'][0],
+                    high=self.session_params['PVT_ITI'][1] + 1
+                )
+                np.append(timestamps, timestamp)
+
+        elif np.sum(timestamps) > self.session_params['exp_duration']:
+            # If sum longer than desired, iteratively trim values
+            while np.sum(timestamps) < self.session_params['exp_duration']:
+                timestamps = timestamps[:-1]
+
+
+        # Shuffle final list of timestamps. This is statistically redundant but superstition guides me
+        shuffle(timestamps)
+
+        # Convert timestamps into ascending values by setting each to the cumulative sum of itself and prior values.
+        # And assign the resulting list as the finalized sequence of PVT events
+        self.session_params['PVT_timestamps'] = np.cumsum(timestamps)
+
         # Generate geometric sequence of interval durations
         # TODO: Actually, now that I think about it, aren't PVT trials uniformly distributed? This can be changed later.
-        intervals = np.around(
-            np.geomspace(
-                start=self.session_params['PVT_interval_bounds'][0],
-                stop=self.session_params['PVT_interval_bounds'][1],
-                num=self.session_params['PVT_rate']  # Desired number of intervals to return
-            )
-        ).astype(int)
-
-        # Populate timestamps
-        self.session_params['PVT_timestamps'] = intervals
-
-        # Keep generating & adding intervals until running sum approaches experiment duration
-        while np.sum(self.session_params['PVT_timestamps']) <= (self.session_params['exp_duration'] - np.sum(intervals)):
-            self.session_params['PVT_timestamps'] = np.append(self.session_params['PVT_timestamps'], intervals)
-
-        # shuffle intervals (otherwise it would be a repeating sequence)
-        shuffle(self.session_params['PVT_timestamps'])
-        # Convert intervals into timestamps by taking cumulative sum of preceding intervals
-        self.session_params['PVT_timestamps'] = np.cumsum(self.session_params['PVT_timestamps'])
+        # intervals = np.around(
+        #     np.geomspace(
+        #         start=self.session_params['PVT_interval_bounds'][0],
+        #         stop=self.session_params['PVT_interval_bounds'][1],
+        #         num=self.session_params['PVT_rate']  # Desired number of intervals to return
+        #     )
+        # ).astype(int)
+        #
+        # # Populate timestamps
+        # self.session_params['PVT_timestamps'] = intervals
+        #
+        # # Keep generating & adding intervals until running sum approaches experiment duration
+        # while np.sum(self.session_params['PVT_timestamps']) <= (self.session_params['exp_duration'] - np.sum(intervals)):
+        #     self.session_params['PVT_timestamps'] = np.append(self.session_params['PVT_timestamps'], intervals)
+        #
+        # # shuffle intervals (otherwise it would be a repeating sequence)
+        # shuffle(self.session_params['PVT_timestamps'])
+        # # Convert intervals into timestamps by taking cumulative sum of preceding intervals
+        # self.session_params['PVT_timestamps'] = np.cumsum(self.session_params['PVT_timestamps'])
 
 
     def refresh(self, event_queue):
