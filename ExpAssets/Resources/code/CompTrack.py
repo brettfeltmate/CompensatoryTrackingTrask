@@ -175,10 +175,6 @@ class CompTrack(EnvAgent):
             while np.sum(timestamps) < self.session_params['exp_duration']:
                 timestamps = timestamps[:-1]
 
-
-        # Shuffle final list of timestamps. This is statistically redundant but superstition guides me
-        shuffle(timestamps)
-
         # Convert timestamps into ascending values by setting each to the cumulative sum of itself and prior values.
         # And assign the resulting list as the finalized sequence of PVT events
         self.session_params['PVT_timestamps'] = np.cumsum(timestamps)
@@ -276,6 +272,7 @@ class CompTrack(EnvAgent):
     # TODO: will be implemented in conjunction with the below function to add an additional degree of randomness
     #       how to actually generate & employ these values is up for discussion
     #       which is to say, the use of tan() and geomspace() are literally just me fucking around.
+
     def __compute_buffet_modifier_values(self, start=0.1, stop=1.4, count=100):
         # Generates cyclical sequence of modifier terms used to generate additional buffeting forces
         modifiers = np.tan(np.geomspace(start, stop, count))
