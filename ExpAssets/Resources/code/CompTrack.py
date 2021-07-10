@@ -14,7 +14,6 @@
 #  - presenting alerting signals either randomly or conditionally
 
 from copy import deepcopy
-from random import shuffle
 
 import numpy as np
 import sdl2
@@ -105,7 +104,9 @@ class CompTrack(EnvAgent):
                 int(0.5 * self.stim_sizes['cursor']),
                 int(P.screen_x - 0.5 * self.stim_sizes['cursor'])
             ],
-            'additional_force': []
+            'additional_force': [],
+            'lapse_threshold': None,            # RT cutoff to be labelled a lapse
+            'window_width': None                # Width (i.e., # PVT responses) of window within which to compute metrics
 
         }
 
@@ -302,8 +303,8 @@ class CompTrack(EnvAgent):
     def __compute_forces(self):
         # Aggregates buffeting forces to be applied on next render
         self.event_data['buffeting_force'] = self.__buffeting_force()
-        #self.event_data['additional_force'] = self.__additional_buffeting_force()
-        self.event_data['total_force'] = self.event_data['buffeting_force'] #+ self.event_data['additional_force']
+        # self.event_data['additional_force'] = self.__additional_buffeting_force()
+        self.event_data['total_force'] = self.event_data['buffeting_force']  # + self.event_data['additional_force']
 
 
     def __fetch_response(self, event_queue):
