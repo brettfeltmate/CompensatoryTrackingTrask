@@ -36,7 +36,7 @@ class CompTrack(EnvAgent):
         # Define styles & create stimuli
         #
         self.palette = {
-            'grue': (025, 025, 28),  # mysteriously, leading zero throws a syntax error in last value
+            'grue': (25, 25, 28),  # mysteriously, leading zero throws a syntax error in last value
             'white': (255, 255, 255),
             'red': (255, 000, 000),
             'green': (000, 255, 000),

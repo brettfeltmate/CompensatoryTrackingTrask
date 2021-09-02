@@ -6,7 +6,7 @@ import klibs
 from klibs import P
 from klibs.KLGraphics import *
 from klibs.KLUtilities import *
-#from klibs.KLUserInterface import *
+from klibs.KLUserInterface import *
 from klibs.KLGraphics.KLNumpySurface import *
 from CompTrack import *
 
@@ -80,7 +80,7 @@ class CompensatoryTrackingTask(klibs.Experiment):
 		p = subprocess.Popen(
 			"defaults read ~/Library/Preferences/.GlobalPreferences CGDisableCursorLocationMagnification 1", shell=True)
 		if p is 0:
-			fill((025, 025, 28))
+			fill((25, 25, 28))
 			blit(NumpySurface(import_image_file('ExpAssets/Resources/image/accessibility_warning.png')), 5, P.screen_c)
 			msg = 'Please ensure cursor shake-magnification is off before running this experiment.'
 			x_pos = int((P.screen_y - 568) * 0.25) + 16
