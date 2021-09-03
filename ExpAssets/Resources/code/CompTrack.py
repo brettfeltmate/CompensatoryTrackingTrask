@@ -96,7 +96,7 @@ class CompTrack(EnvAgent):
         self.session_params = {
             'poll_while_moving': True,          # Should PVT events occur during tracking?
             'poll_at_fixation': False,          # Should PVT events occur upon reaching centre?
-            'exp_duration': 300,                # Duration of task in seconds
+            'exp_duration': 180,                # Duration of task in seconds
             'PVT_ITI': [2, 10],                 # Min & max bounds defining inter-trial interval between PVT onsets
             'PVT_timestamps': None,             # List of timepoints at which to present PVT, populated at runtime
             'reset_target_after_poll': True,    # Should cursor be re-centred following a PVT event?
@@ -143,6 +143,8 @@ class CompTrack(EnvAgent):
         # Reassigned with copy of data_template on each call to refresh()
         self.event_data = None
 
+        self.n = 0
+
 
     def generate_PVT_timestamps(self):
         # Generates time-points at which to present PVT events
@@ -173,7 +175,7 @@ class CompTrack(EnvAgent):
 
         elif np.sum(timestamps) > self.session_params['exp_duration']:
             # If sum longer than desired, iteratively trim values
-            while np.sum(timestamps) < self.session_params['exp_duration']:
+            while np.sum(timestamps) > self.session_params['exp_duration']:
                 timestamps = timestamps[:-1]
 
         # Convert timestamps into ascending values by setting each to the cumulative sum of itself and prior values.
@@ -182,6 +184,7 @@ class CompTrack(EnvAgent):
 
 
     def refresh(self, event_queue):
+        self.n += 1
         # Handles event sequence for each refresh, called by experiment.py
 
         # Init event data container
@@ -214,8 +217,10 @@ class CompTrack(EnvAgent):
             # Update cursor position, applying mouse input & buffeting forces
             self.position = self.position + self.event_data['total_force'] + self.event_data['user_input']
 
-        # Write trial details to database
-        self.__write_data()
+        if self.n == 3 or self.current_state['do_PVT']:
+            # Write trial details to database
+            self.__write_data()
+            self.n = 0
         # Render stimuli
         self.__render()
 
@@ -363,7 +368,7 @@ class CompTrack(EnvAgent):
                 'user_input': self.event_data['user_input'],
                 'target_position': self.position,
                 'displacement': line_segment_len(P.screen_c, [self.position, P.screen_c[1]]),
-                'PVT_event': self.event_data['PVT_RT'] is not 'NA',
+                'PVT_event': self.current_state['do_PVT'] or self.event_data['PVT_RT'] is not 'NA',
                 'PVT_RT': self.event_data['PVT_RT']
             },
             'comp_track_data'
