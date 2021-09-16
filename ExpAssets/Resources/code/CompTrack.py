@@ -12,7 +12,7 @@
 # Class functionality will eventually be expanded to allow for:
 #  - dynamically setting difficulty conditional on PVT performance
 #  - presenting alerting signals either randomly or conditionally
-
+import random
 from copy import deepcopy
 
 import numpy as np
@@ -23,6 +23,7 @@ from klibs.KLEnvironment import EnvAgent
 from klibs.KLGraphics.KLDraw import *
 from klibs.KLUtilities import *
 
+# TODO: move to init
 sdl2.SDL_SetRelativeMouseMode(sdl2.SDL_TRUE)
 
 
@@ -45,7 +46,7 @@ class CompTrack(EnvAgent):
 
         self.stim_sizes = {
             'cursor': deg_to_px(1),
-            'fixation': [deg_to_px(1.4), deg_to_px(0.2)],
+            'target': [deg_to_px(1.4), deg_to_px(0.2)],
             'PVT_frame': [deg_to_px(6), deg_to_px(3)],
             'PVT_digits': deg_to_px(1.5),
             'inner_ring': [P.screen_x * 0.3, deg_to_px(0.1)],
@@ -58,9 +59,9 @@ class CompTrack(EnvAgent):
 
         # Visual assets
         self.assets = {
-            'fixation': Annulus(
-                diameter=self.stim_sizes['fixation'][0],
-                thickness=self.stim_sizes['fixation'][1],
+            'target': Annulus(
+                diameter=self.stim_sizes['target'][0],
+                thickness=self.stim_sizes['target'][1],
                 fill=self.palette['white']
             ),
             'inner_ring': Annulus(
@@ -86,27 +87,26 @@ class CompTrack(EnvAgent):
                 width=self.stim_sizes['PVT_frame'][0],
                 height=self.stim_sizes['PVT_frame'][1],
                 stroke=[2, self.palette['red'], STROKE_OUTER]
-                ).render()
+            ).render()
         }
-
 
         #
         # Initialize task parameters
         #
         self.session_params = {
-            'poll_while_moving': True,          # Should PVT events occur during tracking?
-            'poll_at_fixation': False,          # Should PVT events occur upon reaching centre?
-            'exp_duration': 180,                # Duration of task in seconds
-            'PVT_ITI': [2, 10],                 # Min & max bounds defining inter-trial interval between PVT onsets
-            'PVT_timestamps': None,             # List of timepoints at which to present PVT, populated at runtime
-            'reset_target_after_poll': True,    # Should cursor be re-centred following a PVT event?
-            'x_bounds': [                       # To prevent cursor moving off screen
+            'poll_while_moving': True,  # Should PVT events occur during tracking?
+            'poll_at_fixation': False,  # Should PVT events occur upon reaching centre?
+            'exp_duration': 180,  # Duration of task in seconds
+            'PVT_ITI': [2, 10],  # Min & max bounds defining inter-trial interval between PVT onsets
+            'PVT_timestamps': None,  # List of timepoints at which to present PVT, populated at runtime
+            'reset_target_after_poll': True,  # Should cursor be re-centred following a PVT event?
+            'x_bounds': [  # To prevent cursor moving off screen
                 int(0.5 * self.stim_sizes['cursor']),
                 int(P.screen_x - 0.5 * self.stim_sizes['cursor'])
             ],
             'additional_force': [],
-            'lapse_threshold': None,            # RT cutoff to be labelled a lapse
-            'window_width': None                # Width (i.e., # PVT responses) of window within which to compute metrics
+            'lapse_threshold': None,  # RT cutoff to be labelled a lapse
+            'window_width': None  # Width (i.e., # PVT responses) of window within which to compute metrics
 
         }
 
@@ -114,18 +114,16 @@ class CompTrack(EnvAgent):
         # Initialize container to store dynamic properties
         #
         self.current_state = {
-            'x_pos': P.screen_c[0],     # Stores current x-pos of cursor
-            'do_PVT': False,            # When True, PVT is presented on current refresh
-            'PVT_start': None,          # Stores timestamp of PVT onset
-            'current_modifier': 0,      # Indexes which modifier value is to be used on current refresh
-            'PVT_event_count': 0        # Stores running total of PVT events presented
+            'target_x_pos': P.screen_c[0],
+            'cursor_x_pos': P.screen_c[0],  # Stores current x-pos of cursor
+            'do_PVT': False,  # When True, PVT is presented on current refresh
+            'PVT_start': None,  # Stores timestamp of PVT onset
+            'current_modifier': 0,  # Indexes which modifier value is to be used on current refresh
+            'PVT_event_count': 0  # Stores running total of PVT events presented
         }
 
-
-
-
         # Generate modifier values using initial default values
-        self.__compute_buffet_modifier_values()
+        #self.__compute_buffet_modifier_values()
 
         # Defines template for data recording
         # Each refresh a copy is made, populated, and inserted into database
@@ -145,8 +143,8 @@ class CompTrack(EnvAgent):
 
         self.n = 0
 
-
     def generate_PVT_timestamps(self):
+        #print('jenn stamps')
         # Generates time-points at which to present PVT events
 
         # Initial list of timestamps is created to be of
@@ -165,23 +163,27 @@ class CompTrack(EnvAgent):
         # At least, pragmatically so. This will likely result in one too few or many events,
         # but that shouldn't matter.
         if np.sum(timestamps) < self.session_params['exp_duration']:
+            #print('lesser')
             # If sum of timestamps shorter than desired, iteratively append new values
             while np.sum(timestamps) < self.session_params['exp_duration']:
+                #print('still lesser')
                 timestamp = np.random.randint(
                     low=self.session_params['PVT_ITI'][0],
                     high=self.session_params['PVT_ITI'][1] + 1
                 )
-                np.append(timestamps, timestamp)
+                timestamps = np.append(timestamps, timestamp)
 
         elif np.sum(timestamps) > self.session_params['exp_duration']:
+            #print('greater')
             # If sum longer than desired, iteratively trim values
             while np.sum(timestamps) > self.session_params['exp_duration']:
+                #print('still greater')
                 timestamps = timestamps[:-1]
+        #print('stamps jenned')
 
         # Convert timestamps into ascending values by setting each to the cumulative sum of itself and prior values.
         # And assign the resulting list as the finalized sequence of PVT events
         self.session_params['PVT_timestamps'] = np.cumsum(timestamps)
-
 
     def refresh(self, event_queue):
         self.n += 1
@@ -215,21 +217,24 @@ class CompTrack(EnvAgent):
         if not self.current_state['do_PVT']:
             self.__capture_input(event_queue)
             # Update cursor position, applying mouse input & buffeting forces
-            self.position = self.position + self.event_data['total_force'] + self.event_data['user_input']
 
-        if self.n == 3 or self.current_state['do_PVT']:
+            self.cursor_position = self.cursor_position + self.event_data['user_input']
+            self.target_position = self.target_position + self.event_data['total_force']
+
+        if self.n == 3 or self.event_data['PVT_RT'] != 'NA':
             # Write trial details to database
             self.__write_data()
             self.n = 0
         # Render stimuli
         self.__render()
 
-
     def __render(self):
         # Renders stimuli to screen
 
         # Paint & populate display
         fill(self.palette['grue'])
+
+        self.current_state['do_PVT'] = False
 
         # Spawn & blit PVT display (if PVT event)
         if self.current_state['do_PVT']:
@@ -242,15 +247,14 @@ class CompTrack(EnvAgent):
             blit(digits, BL_CENTER, P.screen_c)
         # Otherwise, blit cursor to updated position
         else:
-            blit(self.assets['fixation'], BL_CENTER, P.screen_c)
             blit(self.assets['inner_ring'], BL_CENTER, P.screen_c)
             blit(self.assets['middle_ring'], BL_CENTER, P.screen_c)
             blit(self.assets['outer_ring'], BL_CENTER, P.screen_c)
-            blit(self.assets['cursor'], BL_CENTER, [self.position, P.screen_c[1]])
+            blit(self.assets['target'], BL_CENTER, [self.target_position, P.screen_c[1]])
+            blit(self.assets['cursor'], BL_CENTER, [self.cursor_position, P.screen_c[1]])
 
         # Present display
         flip()
-
 
     # TODO: Jon. Don't get me started on how frustrated it makes me that our
     #       prior efforts were basically tossed away (and likely to be revived).
@@ -271,9 +275,10 @@ class CompTrack(EnvAgent):
         # i.e., scales resultant displacement value applied to cursor.
 
         t = self.event_data['timestamp']
-        return sin(t) + sin(0.3*t) + sin(0.5*t) + sin(0.7*t) - sin(0.9*t)
 
+        scalars = np.random.uniform(0, 4, 4)
 
+        return sin(t) + sin(0.3 * t + 1) + sin(0.5 * t + 2) + sin(0.7 * t + 3) - sin(0.9 * t + 4)
 
     # TODO: will be implemented in conjunction with the below function to add an additional degree of randomness
     #       how to actually generate & employ these values is up for discussion
@@ -287,15 +292,12 @@ class CompTrack(EnvAgent):
         # TODO: come up with clever Missy Elliot reference then port to function
         flip_and_reverse = np.negative(modifiers[-1:1:-1])
 
-
         self.session_params['additional_force'] = np.append(modifiers, flip_and_reverse)
 
     # TODO: Currently not in use, as it remains to be decided how/why/when to generate additional forces.
     def __additional_buffeting_force(self):
         # Generates additional buffeting forces
         mod_idx = self.current_state['current_modifier']
-
-
 
         if self.current_state['current_modifier'] == len(self.session_params['additional_force']) - 1:
             self.current_state['current_modifier'] = 0
@@ -311,7 +313,6 @@ class CompTrack(EnvAgent):
         # self.event_data['additional_force'] = self.__additional_buffeting_force()
         self.event_data['total_force'] = self.event_data['buffeting_force']  # + self.event_data['additional_force']
 
-
     def __fetch_response(self, event_queue):
         # Captures PVT responses
         if not self.current_state['do_PVT']:  # Do nothing if nothing need doing
@@ -320,7 +321,7 @@ class CompTrack(EnvAgent):
         # Time elapsed since PVT onset
         rt = now() - self.current_state['PVT_start']
 
-        if rt < 1:          # Until 1 sec has passed, listen for response
+        if rt < 1:  # Until 1 sec has passed, listen for response
             for event in event_queue:
                 if event.type == SDL_KEYDOWN:
                     key = event.key.keysym  # keyboard button event object
@@ -334,8 +335,8 @@ class CompTrack(EnvAgent):
         if self.event_data['PVT_RT'] != 'NA':
             self.current_state['do_PVT'] = False
             if self.session_params['reset_target_after_poll']:
-                self.position = P.screen_c[0]
-
+                self.cursor_position = P.screen_c[0]
+                self.target_position = P.screen_c[0]
 
     def __capture_input(self, event_queue):
         # Captures mouse motion events
@@ -354,7 +355,6 @@ class CompTrack(EnvAgent):
         # Maintain mouse cursor at screen center to ensure all movement is catchable (i.e., can't run off screen)
         mouse_pos(False, P.screen_c)
 
-
     # TODO: Jon, I rejigged how data is written. Now it all gets inserted into a single DB
     def __write_data(self):
         # Writes event by event data to database
@@ -366,14 +366,13 @@ class CompTrack(EnvAgent):
                 'additional_force': self.event_data['additional_force'],
                 'total_force': self.event_data['total_force'],
                 'user_input': self.event_data['user_input'],
-                'target_position': self.position,
-                'displacement': line_segment_len(P.screen_c, [self.position, P.screen_c[1]]),
-                'PVT_event': self.current_state['do_PVT'] or self.event_data['PVT_RT'] is not 'NA',
+                'target_position': self.target_position,
+                'displacement': line_segment_len([self.target_position, P.screen_c[1]], [self.cursor_position, P.screen_c[1]]),
+                'PVT_event': self.current_state['do_PVT'] or self.event_data['PVT_RT'] != 'NA',
                 'PVT_RT': self.event_data['PVT_RT']
             },
             'comp_track_data'
         )
-
 
     # Will be used to monitor running PVT performance, once the rules around that are decided.
     # TODO: After N trials, begin calling this function to query last N PVT responses
@@ -396,14 +395,18 @@ class CompTrack(EnvAgent):
         except IndexError:
             return 0
 
+    @property
+    def cursor_position(self):
+        # get current position of cursor
+        return self.current_state['cursor_x_pos']
 
     @property
-    def position(self):
+    def target_position(self):
         # get current position of cursor
-        return self.current_state['x_pos']
+        return self.current_state['target_x_pos']
 
-    @position.setter
-    def position(self, val):
+    @cursor_position.setter
+    def cursor_position(self, val):
         # Set position of cursor, censors values which would place the cursor off screen
         if int(val) not in range(*self.session_params['x_bounds']):
             if val < self.session_params['x_bounds'][0]:
@@ -411,4 +414,15 @@ class CompTrack(EnvAgent):
             else:
                 val = self.session_params['x_bounds'][1]
 
-        self.current_state['x_pos'] = val
+        self.current_state['cursor_x_pos'] = val
+
+    @target_position.setter
+    def target_position(self, val):
+        # Set position of cursor, censors values which would place the cursor off screen
+        if int(val) not in range(*self.session_params['x_bounds']):
+            if val < self.session_params['x_bounds'][0]:
+                val = self.session_params['x_bounds'][0]
+            else:
+                val = self.session_params['x_bounds'][1]
+
+        self.current_state['target_x_pos'] = val
