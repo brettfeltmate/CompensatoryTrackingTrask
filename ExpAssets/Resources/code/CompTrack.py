@@ -12,6 +12,7 @@
 # Class functionality will eventually be expanded to allow for:
 #  - dynamically setting difficulty conditional on PVT performance
 #  - presenting alerting signals either randomly or conditionally
+import math
 import random
 from copy import deepcopy
 
@@ -32,6 +33,8 @@ class CompTrack(EnvAgent):
     def __init__(self):
         super(CompTrack, self).__init__()
         self.__init_time = now()
+        self.switch_time = random.randint(5000, 10000) / 1000
+        self.wave_func = 'sin'
 
         #
         # Define styles & create stimuli
@@ -219,7 +222,7 @@ class CompTrack(EnvAgent):
             # Update cursor position, applying mouse input & buffeting forces
 
             self.cursor_position = self.cursor_position + self.event_data['user_input']
-            self.target_position = self.target_position + self.event_data['total_force']
+            self.target_position = P.screen_c[0] + self.event_data['total_force']
 
         if self.n == 3 or self.event_data['PVT_RT'] != 'NA':
             # Write trial details to database
@@ -274,11 +277,10 @@ class CompTrack(EnvAgent):
         # value in "val * sin(timestamp)" modifies amplitude of sin wave, but not periodicity
         # i.e., scales resultant displacement value applied to cursor.
 
+
         t = self.event_data['timestamp']
 
-        scalars = np.random.uniform(0, 4, 4)
-
-        return sin(t) + sin(0.3 * t + 1) + sin(0.5 * t + 2) + sin(0.7 * t + 3) - sin(0.9 * t + 4)
+        return (P.screen_x / 3 / math.pi) * (sin(t) + sin(0.3 * t) + cos(0.5 * t) + sin(0.7 * t) - cos(0.9 * t))
 
     # TODO: will be implemented in conjunction with the below function to add an additional degree of randomness
     #       how to actually generate & employ these values is up for discussion
