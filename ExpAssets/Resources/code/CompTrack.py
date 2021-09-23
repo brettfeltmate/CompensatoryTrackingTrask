@@ -237,7 +237,7 @@ class CompTrack(EnvAgent):
         # Paint & populate display
         fill(self.palette['grue'])
 
-        self.current_state['do_PVT'] = False
+        #self.current_state['do_PVT'] = False
 
         # Spawn & blit PVT display (if PVT event)
         if self.current_state['do_PVT']:
